@@ -1,6 +1,6 @@
-# Welcome to your Expo app 👋
+# Welcome to indiSign 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a react-native app made for deaf people enabling them to learn to communicate using 3d-animated models and gamified assignments.
 
 ## Get started
 
@@ -9,42 +9,83 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npm install
    ```
-
-2. Start the app
-
    ```bash
-    npx expo start
+   npm install three @react-three/fiber
+   ```
+   ```bash
+   npx expo install expo-gl
    ```
 
-In the output, you'll find options to open the app in a
+2. Create custom metro.config.js
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   npx expo customize metro.config.js
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+3. Update metro.config.js
+   ```
+   // Learn more https://docs.expo.io/guides/customizing-metro
+   const { getDefaultConfig } = require('expo/metro-config');
 
-## Get a fresh project
+   const defaultConfig = getDefaultConfig(__dirname);
 
-When you're ready, run:
+   defaultConfig.resolver.assetExts.push('glb');
 
-```bash
-npm run reset-project
-```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+   [("js", "jsx", "json", "ts", "tsx", "cjs", "mjs")].forEach((ext) => {
+   if (defaultConfig.resolver.sourceExts.indexOf(ext) === -1) {
+      defaultConfig.resolver.sourceExts.push(ext);
+   }
+   });
 
-## Learn more
+   ["glb", "gltf", "png", "jpg"].forEach((ext) => {
+   if (defaultConfig.resolver.assetExts.indexOf(ext) === -1) {
+      defaultConfig.resolver.assetExts.push(ext);
+   }
+   });
 
-To learn more about developing your project with Expo, look at the following resources:
+   module.exports = defaultConfig;
+   ```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3. Add your own firebaseConfig.ts file
+    ```
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "firebase/app";
+    import { getFirestore } from "firebase/firestore";
+    import { getAuth } from 'firebase/auth';
 
-## Join the community
 
-Join our community of developers creating universal apps.
+    // Your web app's Firebase configuration
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+    const firebaseConfig = {
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: "",
+    measurementId: ""
+    };
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+
+    export const db = getFirestore(app);
+    export const auth = getAuth(app);
+    ```
+
+    you can get this file by creating an app on https://console.firebase.google.com
+
+
+3. Start the app
+
+   ```bash
+    npx expo start -c
+   ``` 
+
+
+# Guides
+1. https://threejs.org/docs/index.html#manual/en/introduction/Creating-a-scene
+1. https://docs.expo.dev/tutorial/create-your-first-app/
+1. https://docs.expo.dev/guides/using-firebase/
+1. https://firebase.google.com/docs/web/setup#register-app
