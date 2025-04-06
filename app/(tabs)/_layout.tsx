@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/db/firebaseConfig';
+import { auth } from '../../db/firebaseConfig';
 import { FontAwesome5, MaterialCommunityIcons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { User as UserIcon } from 'lucide-react-native';
 

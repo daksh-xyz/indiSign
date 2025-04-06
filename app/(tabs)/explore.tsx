@@ -13,7 +13,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { db } from '@/db/firebaseConfig';
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { auth } from '@/db/firebaseConfig'
+import { collection, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 const { width } = Dimensions.get('window');
 const OPTION_IMAGE_SIZE = Math.min(width * 0.75, 120); // Reduced image size for side-by-side layout
@@ -22,12 +23,13 @@ export default function QuizScreen() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
+  const [dbScore, setdbScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isQuizActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fetchedQuestions, setFetchedQuestions] = useState<Question[]>([]);
   const colorScheme = useColorScheme();
-
 
   interface Question {
     id: string;
@@ -39,31 +41,90 @@ export default function QuizScreen() {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "Questions"));
-        const transformedQuestions: Question[] = querySnapshot.docs.map(doc => {
-          const data = doc.data();
+        // Reference the Quiz1 document in the Quizzes collection
+        const quizDocRef = doc(db, "Quizzes", "Quiz1");
+        const quizDocSnap = await getDoc(quizDocRef);
+  
+        if (!quizDocSnap.exists()) {
+          throw new Error("Quiz does not exist");
+        }
+  
+        const quizData = quizDocSnap.data();
+        // 'Questions' is a map with keys like "Question1", "Question2", etc.
+        const questionsMap = quizData.Questions;
+  
+        // Transform the map into an array of Question objects
+        const transformedQuestions: Question[] = Object.keys(questionsMap).map(key => {
+          const questionData = questionsMap[key];
+          // Map index to option text (assuming order: A, B, C, D)
+          const optionLabels = ["A", "B", "C", "D"];
+          const options = questionData.Options.map((image: string, index: number) => ({
+            text: optionLabels[index] || "",
+            image,
+          }));
+  
           return {
-            id: doc.id,
-            question: data.Question,
-            options: [
-              { text: "A", image: data.OptionA },
-              { text: "B", image: data.OptionB },
-              { text: "C", image: data.OptionC },
-              { text: "D", image: data.OptionD },
-            ],
-            correctAnswer: data.CorrectAnswer
+            id: key, // e.g., "Question1"
+            question: questionData.Question,
+            options,
+            correctAnswer: questionData.Answer,
+            questionID: questionData.questionID, // optional if you need sorting
           };
         });
+  
         setFetchedQuestions(transformedQuestions);
         setError(null);
       } catch (err) {
+        console.error("Error fetching questions: ", err);
         setError('Failed to load questions. Please try again later.');
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchQuestions();
+  }, []);
+
+  useEffect (() => {
+    const fetchQuizState = async () => {
+      try{
+        const user = auth.currentUser;
+        if (!user) return;
+        const userId = user.uid;
+        const quizId = 1;
+        const submissionDocRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
+        const submissionDocSnap = await getDoc(submissionDocRef);
+        if (!submissionDocSnap.exists()) {
+          try {
+            await setDoc(submissionDocRef, {
+              score: 0,
+              submittedAt: "",
+              isActive: true
+            });
+            console.log("New quiz initialized")
+            setError(null)
+          } catch (err){
+            console.error("Error occurred while initializing new quiz: ", err);
+            setError('Failed to initialize quiz state.');
+          } finally {
+            setIsLoading(false);
+            throw new Error("Error while initializing new quiz");
+          }
+        }
+        const submissionData = submissionDocSnap.data();
+        const isActive = submissionData.isActive;
+        const dbScore = submissionData.score;
+        setIsActive(isActive)
+        setdbScore(dbScore)
+        setError(null)
+      } catch(err){
+        console.error("Error occurred while fetching quiz state: ", err);
+        setError('Failed to load quiz state.');
+      } finally{
+        setIsLoading(false);
+      }
+    };
+    fetchQuizState();
   }, []);
 
   const currentQuestion = fetchedQuestions[currentQuestionIndex];
@@ -79,10 +140,11 @@ export default function QuizScreen() {
   const handleNext = () => {
     if (isLastQuestion) {
       setShowResult(true);
+      handleQuizCompletion();
     } else {
       setCurrentQuestionIndex(prev => prev + 1);
       setSelectedAnswer(null);
-    }
+    }    
   };
 
   const restartQuiz = () => {
@@ -90,6 +152,29 @@ export default function QuizScreen() {
     setSelectedAnswer(null);
     setScore(0);
     setShowResult(false);
+  };
+
+
+  const handleQuizCompletion = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+  
+      const userId = user.uid; // or user.email
+      const quizId = 1; // dynamically set this if needed
+      const isActive = score !== fetchedQuestions.length;
+      const submissionRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
+  
+      await setDoc(submissionRef, {
+        score: score,
+        submittedAt: serverTimestamp(),
+        isActive: isActive
+      });
+  
+      console.log("User submission saved!");
+    } catch (err) {
+      console.error("Failed to submit quiz:", err);
+    }
   };
 
   const isDark = colorScheme === 'dark';
@@ -116,7 +201,23 @@ export default function QuizScreen() {
     );
   }
 
-  if (showResult) {
+  if (!isQuizActive) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultTitle}>Quiz already attempted!</Text>
+          <Text style={styles.resultScore}>
+            Your Score: {dbScore}/{fetchedQuestions.length}
+          </Text>
+          <Text style={styles.resultPercentage}>
+            ({Math.round((dbScore / fetchedQuestions.length) * 100)}%)
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  else if (showResult) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -128,9 +229,11 @@ export default function QuizScreen() {
           <Text style={styles.resultPercentage}>
             ({Math.round((score / fetchedQuestions.length) * 100)}%)
           </Text>
-          <TouchableOpacity style={styles.restartButton} onPress={restartQuiz}>
-            <Text style={styles.restartButtonText}>Restart Quiz</Text>
-          </TouchableOpacity>
+          {score === fetchedQuestions.length ? null : (
+            <TouchableOpacity style={styles.restartButton} onPress={restartQuiz}>
+              <Text style={styles.restartButtonText}>Restart Quiz</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );
