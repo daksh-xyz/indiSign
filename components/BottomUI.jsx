@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { SafeAreaView, View, Button, TextInput, StyleSheet } from "react-native";
+import { useColorScheme } from "@/hooks/useColorScheme.web";
 
 export const BottomUI = ({ inputText, setInputText, onSubmit }) => {
+  const colorScheme = useColorScheme();
+  const color = colorScheme === 'dark' ? "#303030" : "#f0ecec";
+  const bgcolor = colorScheme === 'dark' ? "#aaaaaa" : "#f0ecec";
   return (
     <SafeAreaView edges={["bottom"]}>
-      <View style={{ padding: 20 }}>
+      <View style={{ padding: 20, backgroundColor: color}}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, {backgroundColor: bgcolor}]}
           placeholder="Type Something..."
           onChangeText={setInputText}
           value={inputText}
@@ -25,7 +29,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 10,
     borderRadius: 8,
-    backgroundColor: "#aaaaaa",
-    color: "#303030"
+    color: '#3030'
   },
 });

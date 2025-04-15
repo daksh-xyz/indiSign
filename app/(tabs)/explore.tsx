@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,30 @@ import {
   ScrollView,
   Image,
   Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { db } from '@/db/firebaseConfig';
-import { auth } from '@/db/firebaseConfig'
+import { auth } from '@/db/firebaseConfig';
 import { collection, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 const { width } = Dimensions.get('window');
-const OPTION_IMAGE_SIZE = Math.min(width * 0.75, 120); // Reduced image size for side-by-side layout
+const OPTION_IMAGE_SIZE = Math.min(width * 0.75, 120);
+
+interface Question {
+  id: string;
+  question: string;
+  options: Array<{ text: string; image: string }>;
+  correctAnswer: string;
+}
 
 export default function QuizScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const styles = createStyles(isDark);
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
@@ -29,139 +41,100 @@ export default function QuizScreen() {
   const [isQuizActive, setIsActive] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fetchedQuestions, setFetchedQuestions] = useState<Question[]>([]);
-  const colorScheme = useColorScheme();
-
-  interface Question {
-    id: string;
-    question: string;
-    options: Array<{ text: string; image: string }>;
-    correctAnswer: string;
-  }
-
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        // Reference the Quiz1 document in the Quizzes collection
-        const quizDocRef = doc(db, "Quizzes", "Quiz1");
-        const quizDocSnap = await getDoc(quizDocRef);
-  
-        if (!quizDocSnap.exists()) {
-          throw new Error("Quiz does not exist");
-        }
-  
-        const quizData = quizDocSnap.data();
-        // 'Questions' is a map with keys like "Question1", "Question2", etc.
-        const questionsMap = quizData.Questions;
-  
-        // Transform the map into an array of Question objects
-        const transformedQuestions: Question[] = Object.keys(questionsMap).map(key => {
-          const questionData = questionsMap[key];
-          // Map index to option text (assuming order: A, B, C, D)
-          const optionLabels = ["A", "B", "C", "D"];
-          const options = questionData.Options.map((image: string, index: number) => ({
-            text: optionLabels[index] || "",
-            image,
-          }));
-  
-          return {
-            id: key, // e.g., "Question1"
-            question: questionData.Question,
-            options,
-            correctAnswer: questionData.Answer,
-            questionID: questionData.questionID, // optional if you need sorting
-          };
-        });
-  
-        setFetchedQuestions(transformedQuestions);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching questions: ", err);
-        setError('Failed to load questions. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-  
-    fetchQuestions();
-  }, []);
-
-  useEffect (() => {
-    const fetchQuizState = async () => {
-      try{
-        const user = auth.currentUser;
-        if (!user) return;
-        const userId = user.uid;
-        const quizId = 1;
-        const submissionDocRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
-        const submissionDocSnap = await getDoc(submissionDocRef);
-        if (!submissionDocSnap.exists()) {
-          try {
-            await setDoc(submissionDocRef, {
-              score: 0,
-              submittedAt: "",
-              isActive: true
-            });
-            console.log("New quiz initialized")
-            setError(null)
-          } catch (err){
-            console.error("Error occurred while initializing new quiz: ", err);
-            setError('Failed to initialize quiz state.');
-          } finally {
-            setIsLoading(false);
-            throw new Error("Error while initializing new quiz");
-          }
-        }
-        const submissionData = submissionDocSnap.data();
-        const isActive = submissionData.isActive;
-        const dbScore = submissionData.score;
-        setIsActive(isActive)
-        setdbScore(dbScore)
-        setError(null)
-      } catch(err){
-        console.error("Error occurred while fetching quiz state: ", err);
-        setError('Failed to load quiz state.');
-      } finally{
-        setIsLoading(false);
-      }
-    };
-    fetchQuizState();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
 
   const currentQuestion = fetchedQuestions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === fetchedQuestions.length - 1;
 
-  const handleAnswerSelect = (answer: string) => {
+  const fetchQuizData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const quizDocRef = doc(db, "Quizzes", "Quiz2");
+      const quizDocSnap = await getDoc(quizDocRef);
+
+      if (!quizDocSnap.exists()) {
+        throw new Error("Quiz does not exist");
+      }
+
+      const quizData = quizDocSnap.data();
+      const questionsMap = quizData.Questions;
+
+      const transformedQuestions: Question[] = Object.keys(questionsMap).map(key => {
+        const questionData = questionsMap[key];
+        const optionLabels = ["A", "B", "C", "D"];
+        const options = questionData.Options.map((image: string, index: number) => ({
+          text: optionLabels[index] || "",
+          image,
+        }));
+
+        return {
+          id: key,
+          question: questionData.Question,
+          options,
+          correctAnswer: questionData.Answer,
+          questionID: questionData.questionID,
+        };
+      });
+
+      setFetchedQuestions(transformedQuestions);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+      
+      const userId = user.uid;
+      const quizId = 2;
+      const submissionDocRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
+      const submissionDocSnap = await getDoc(submissionDocRef);
+
+      if (!submissionDocSnap.exists()) {
+        await setDoc(submissionDocRef, {
+          score: 0,
+          submittedAt: "",
+          isActive: true
+        });
+        setIsActive(true);
+        setdbScore(0);
+      } else {
+        const submissionData = submissionDocSnap.data();
+        setIsActive(submissionData.isActive);
+        setdbScore(submissionData.score);
+      }
+
+      setError(null);
+    } catch (err) {
+      console.error("Error loading quiz data:", err);
+      setError('Failed to load quiz. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchQuizData();
+  }, [fetchQuizData]);
+
+  useEffect(() => {
+    fetchQuizData();
+  }, [fetchQuizData]);
+
+  const handleAnswerSelect = useCallback((answer: string) => {
     setSelectedAnswer(answer);
     if (answer === currentQuestion?.correctAnswer) {
       setScore(prev => prev + 1);
     }
-  };
+  }, [currentQuestion]);
 
-  const handleNext = () => {
-    if (isLastQuestion) {
-      setShowResult(true);
-      handleQuizCompletion();
-    } else {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setSelectedAnswer(null);
-    }    
-  };
-
-  const restartQuiz = () => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswer(null);
-    setScore(0);
-    setShowResult(false);
-  };
-
-
-  const handleQuizCompletion = async () => {
+  const handleQuizCompletion = useCallback(async () => {
     try {
       const user = auth.currentUser;
       if (!user) return;
   
-      const userId = user.uid; // or user.email
-      const quizId = 1; // dynamically set this if needed
+      const userId = user.uid;
+      const quizId = 2;
       const isActive = score !== fetchedQuestions.length;
       const submissionRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
   
@@ -175,10 +148,24 @@ export default function QuizScreen() {
     } catch (err) {
       console.error("Failed to submit quiz:", err);
     }
-  };
+  }, [score, fetchedQuestions.length]);
 
-  const isDark = colorScheme === 'dark';
-  const styles = createStyles(isDark);
+  const handleNext = useCallback(() => {
+    if (isLastQuestion) {
+      setShowResult(true);
+      handleQuizCompletion();
+    } else {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setSelectedAnswer(null);
+    }    
+  }, [isLastQuestion, handleQuizCompletion]);
+
+  const restartQuiz = useCallback(() => {
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setScore(0);
+    setShowResult(false);
+  }, []);
 
   if (isLoading) {
     return (
@@ -194,9 +181,20 @@ export default function QuizScreen() {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
+        <ScrollView 
+          contentContainerStyle={styles.errorContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           <Text style={styles.errorText}>{error}</Text>
-        </View>
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={onRefresh}
+          >
+            <Text style={styles.refreshButtonText}>Refresh</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -217,7 +215,8 @@ export default function QuizScreen() {
       </SafeAreaView>
     );
   }
-  else if (showResult) {
+
+  if (showResult) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -257,7 +256,13 @@ export default function QuizScreen() {
           />
         </View>
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {currentQuestion?.question && (
           <Text style={styles.question}>{currentQuestion.question}</Text>
         )}
@@ -470,5 +475,17 @@ const createStyles = (isDark: boolean) => StyleSheet.create({
     fontSize: 18,
     color: '#FF3B30',
     textAlign: 'center',
-  }
+  },
+  refreshButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  refreshButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   useColorScheme,
   Alert,
+  TextInput,
+  Platform
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { auth } from '@/db/firebaseConfig';
+import { auth, db } from '@/db/firebaseConfig';
 import {
   signOut,
   sendEmailVerification,
@@ -18,11 +20,17 @@ import {
   User,
 } from 'firebase/auth';
 import { useRouter } from 'expo-router';
-import { Mail, Key, LogOut } from 'lucide-react-native';
+import { Mail, Key, LogOut, MessageSquareText } from 'lucide-react-native';
+import Modal from "react-native-modal";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import StarRating from 'react-native-star-rating-widget';
 
 export default function AccountScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedingback, setFeedingBack] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [inputText, setInputText] = useState('');
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -81,6 +89,29 @@ export default function AccountScreen() {
     }
   };
 
+  const submitFeedback = async () => {
+    if (!user?.email) return;
+    try {
+      setLoading(true);
+      const feedbackDocRef = doc(db, "Feedback", user.uid);
+      await Promise.race([
+        setDoc(feedbackDocRef, {
+          Feedback: inputText,
+          rating: rating,
+          userID: user.uid
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 10000)
+        )
+      ]);
+    } catch (err) {
+      console.error("Error submitting feedback:", err);
+      Alert.alert("An error occurred!", "Failed to submit feedback");
+    } finally {
+      setLoading(false);
+    }
+  };  
+
   if (!user) {
     return null;
   }
@@ -137,6 +168,16 @@ export default function AccountScreen() {
             Reset Password
           </Text>
         </TouchableOpacity>
+        
+        {user.emailVerified && (<TouchableOpacity
+          style={[styles.button, isDark && styles.buttonDark]}
+          onPress={() => {setFeedingBack(true)}}
+          disabled={loading}>
+          <MessageSquareText size={24} color={isDark ? '#fff' : '#000'} />
+          <Text style={[styles.buttonText, isDark && styles.buttonTextDark]}>
+            Feedback
+          </Text>
+        </TouchableOpacity>)}
 
         <TouchableOpacity
           style={[styles.signOutButton, isDark && styles.signOutButtonDark]}
@@ -152,6 +193,24 @@ export default function AccountScreen() {
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
       )}
+      <Modal isVisible={feedingback} onBackdropPress={() => {Platform.OS === "ios" ? setFeedingBack(false) : ""}} onBackButtonPress={() => setFeedingBack(false)}>
+        <View style={isDark ? styles.alertBoxDark : styles.alertBox}>
+          <Text style={[styles.alertTitle, isDark && styles.alertTitleDark]}>Send Feedback</Text>
+          <StarRating
+            rating={rating}
+            onChange={setRating}
+            style={styles.stars}
+          />
+          <TextInput style={styles.alertInput}
+          placeholder="What's on your mind ?"
+          onChangeText={setInputText}
+          value={inputText}
+          />
+          <TouchableOpacity onPress={() => {setFeedingBack(false); inputText !== '' ? submitFeedback() : ""; setInputText('')}}>
+            <Text style={styles.closeButton}>{inputText !== '' ? 'Submit Feedback' : 'Cancel'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -271,4 +330,53 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  alertBoxDark: {
+    backgroundColor: '#383434',
+    padding: 30,
+    borderRadius: 18
+  },
+  alertBox: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 18
+  },
+  alertTitleDark: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 8
+  },
+  alertTitle: {
+    color: '#000',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 8
+  },
+  stars: {
+    marginVertical: 8,
+    marginHorizontal: 'auto'
+  },
+  alertInputDark: {
+    backgroundColor: '#fff',
+    width: '100%',
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 15
+  },
+  alertInput: {
+    backgroundColor: '#f0ecec',
+    width: '100%',
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 15
+  },
+  closeButton: {
+    color: '#fff',
+    paddingVertical: 15,
+    marginVertical: 8,
+    textAlign: 'center',
+    width: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 12
+  }
 });

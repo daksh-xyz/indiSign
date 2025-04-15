@@ -2,14 +2,15 @@ import { Canvas } from '@react-three/fiber/native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BottomUI } from '@/components/BottomUI';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei/native';
-import { Model } from '@/components/Model';
 import * as THREE from 'three';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/db/firebaseConfig';
 import LoginScreen from '@/components/LoginScreen';
 import { useRouter } from 'expo-router';
+import { Model2, ModelHandle } from '../../components/Model2';
+import { useColorScheme } from '@/hooks/useColorScheme.web';
 
 // Create a custom error handler to suppress R3F initialization warnings
 const onCreated = (state: any) => {
@@ -33,6 +34,10 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const modelRef = useRef<ModelHandle>(null);
+  const colorScheme = useColorScheme();
+  const color = colorScheme === 'dark' ? "#303030" : "#f0ecec";
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -73,7 +78,7 @@ export default function App() {
         onCreated={onCreated}
         style={{ flex: 1 }}
         gl={{ preserveDrawingBuffer: true }}>
-        <color attach="background" args={["#303030"]} />
+        <color attach="background" args={[color]} />
         <Suspense fallback={null}>
           <PerspectiveCamera
             position={[0, 0, 10]}
@@ -83,8 +88,8 @@ export default function App() {
             makeDefault
           />
           <directionalLight position={[0, 0, 10]} intensity={1} />
-          <Model key={modelKey} position={[0, -7, 0]} submittedText={submittedText} />
-          <Environment preset="city" />
+          <Model2 key={modelKey} submittedText={submittedText} ref={modelRef}/>
+          <Environment preset="night"/>
           <OrbitControls
             minDistance={1}
             maxDistance={20}
