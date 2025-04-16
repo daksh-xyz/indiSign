@@ -44,7 +44,7 @@ import React, {
       const pending = useRef<boolean>(false);
   
       // Define a speed value (adjust as needed).
-      const speed = 0.1;
+      const speed = 0.025;
 
       const isLetter = (c: string) => {
         return c.toLowerCase() !== c.toUpperCase();

@@ -51,7 +51,15 @@ export default function QuizScreen() {
     setError(null);
     
     try {
-      const quizDocRef = doc(db, "Quizzes", "Quiz2");
+    const quizIdRef = doc(db, "globalQuiz", "QuizID");
+      const quizIdSnap = await getDoc(quizIdRef);
+      if (!quizIdSnap.exists()) {
+        throw new Error("Quiz does not exist");
+      }
+      const quizIdJson = quizIdSnap.data();
+      const quizId = quizIdJson.quizId;
+
+      const quizDocRef = doc(db, "Quizzes", `Quiz${quizId}`);
       const quizDocSnap = await getDoc(quizDocRef);
 
       if (!quizDocSnap.exists()) {
@@ -84,7 +92,6 @@ export default function QuizScreen() {
       if (!user) throw new Error("User not authenticated");
       
       const userId = user.uid;
-      const quizId = 2;
       const submissionDocRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
       const submissionDocSnap = await getDoc(submissionDocRef);
 
@@ -114,7 +121,9 @@ export default function QuizScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchQuizData();
+    setTimeout(() => {
+      fetchQuizData();
+    }, 10000)
   }, [fetchQuizData]);
 
   useEffect(() => {
@@ -132,9 +141,16 @@ export default function QuizScreen() {
     try {
       const user = auth.currentUser;
       if (!user) return;
+
+      const quizIdRef = doc(db, "globalQuiz", "QuizID");
+      const quizIdSnap = await getDoc(quizIdRef);
+      if (!quizIdSnap.exists()) {
+        throw new Error("Quiz does not exist");
+      }
+      const quizIdJson = quizIdSnap.data();
+      const quizId = quizIdJson.quizId;
   
       const userId = user.uid;
-      const quizId = 2;
       const isActive = score !== fetchedQuestions.length;
       const submissionRef = doc(db, "quizSubmissions", `Quiz${quizId}`, "userSubmissions", userId);
   

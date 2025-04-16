@@ -37,6 +37,7 @@ export default function LoginScreen() {
 
       if (isSignUp) {
         await createUserWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, email, password);
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
