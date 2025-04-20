@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  useColorScheme,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { auth } from '@/db/firebaseConfig'
@@ -17,6 +18,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { Lock, Mail, LogIn, UserPlus } from 'lucide-react-native';
+import { Link } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -24,6 +26,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const isDark = useColorScheme() === 'dark';
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -42,7 +45,36 @@ export default function LoginScreen() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+      if (err.code === 'auth/user-not-found') {
+        setError('User not found. Please sign up.');
+      }
+      else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      }
+      else if (err.code === 'auth/email-already-in-use') {
+        setError('Email already in use. Please sign in.');
+      }
+      else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address. Please try again.');
+      }
+      else if (err.code === 'auth/weak-password') {  
+        setError('Weak password. Please use a stronger password.');
+      }
+      else if (err.code === 'auth/operation-not-allowed') {
+        setError('Operation not allowed. Please contact support.');
+      }
+      else if (err.code === 'auth/too-many-requests') {
+        setError('Too many requests. Please try again later.');
+      }
+      else if (err.code === 'auth/unknown') {
+        setError('An unknown error occurred. Please try again.');
+      }
+      else if (err.code === 'auth/invalid-credential') {
+        setError('Invalid credential. Please try again.');
+      }
+      else if (err.code === 'auth/invalid-verification-code') {
+        setError('Invalid verification code. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,18 +92,18 @@ export default function LoginScreen() {
         />
         <View style={styles.overlay} />
         <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+        <Text style={styles.subtitle}>{isSignUp ? "Sign up to continue" : "Sign in to continue"}</Text>
       </View>
 
-      <View style={styles.formContainer}>
+      <View style={[styles.formContainer, isDark ? { backgroundColor: '#1a1a1a' } : { backgroundColor: '#fff' }]}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <View style={styles.inputContainer}>
-          <Mail size={20} color="#666" style={styles.inputIcon} />
+        <View style={[styles.inputContainer, isDark ? { backgroundColor: '#aaaaaa' } : { backgroundColor: '#f0ecec' }]}>
+          <Mail size={20} color={isDark ? '#000' : "#666"} style={styles.inputIcon} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: isDark ? '#000' : "#333" }]}
             placeholder="Email"
-            placeholderTextColor="#666"
+            placeholderTextColor={isDark ? '#000' : "#666"}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -79,12 +111,12 @@ export default function LoginScreen() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Lock size={20} color="#666" style={styles.inputIcon} />
+        <View style={[styles.inputContainer, isDark ? { backgroundColor: '#aaaaaa' } : { backgroundColor: '#f0ecec' }]}>
+          <Lock size={20} color={isDark ? '#000' : "#666"} style={styles.inputIcon} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: isDark ? '#000' : "#333" }]}
             placeholder="Password"
-            placeholderTextColor="#666"
+            placeholderTextColor= {isDark ? "#000" : "#666"}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -120,6 +152,11 @@ export default function LoginScreen() {
               : "Don't have an account? Sign Up"}
           </Text>
         </TouchableOpacity>
+        <Link
+          href="/ForgotPassword"
+          style={styles.switchButton}>
+          <Text style={styles.switchButtonText}>{isSignUp ? "" : "Forgot Password?"}</Text>
+        </Link>
       </View>
     </KeyboardAvoidingView>
   );
@@ -162,11 +199,10 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     flex: 1,
-    backgroundColor: '#fff',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 20,
-    marginTop: -20,
+    marginTop: -30,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -174,6 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     marginBottom: 15,
+    marginTop: 10,
     paddingHorizontal: 15,
   },
   inputIcon: {
@@ -182,7 +219,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: 50,
-    color: '#333',
     fontSize: 16,
   },
   button: {
@@ -203,8 +239,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   switchButton: {
-    marginTop: 20,
-    alignItems: 'center',
+    marginTop: 18,
+    alignSelf: 'center',
   },
   switchButtonText: {
     color: '#007AFF',

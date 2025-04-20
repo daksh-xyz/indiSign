@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import React from 'react';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -16,6 +17,7 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const isDark = colorScheme === 'dark';
 
   useEffect(() => {
     if (loaded) {
@@ -31,6 +33,7 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="ForgotPassword" options={{ title: 'Reset Password', headerStyle: isDark ? {backgroundColor: '#1a1a1a' } : {backgroundColor: '#fff'} }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

@@ -98,7 +98,8 @@ export default function AccountScreen() {
         setDoc(feedbackDocRef, {
           Feedback: inputText,
           rating: rating,
-          userID: user.uid
+          userID: user.uid,
+          time: new Date().toISOString(),
         }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout")), 10000)
@@ -169,15 +170,15 @@ export default function AccountScreen() {
           </Text>
         </TouchableOpacity>
         
-        {user.emailVerified && (<TouchableOpacity
+        <TouchableOpacity
           style={[styles.button, isDark && styles.buttonDark]}
           onPress={() => {setFeedingBack(true)}}
-          disabled={loading}>
-          <MessageSquareText size={24} color={isDark ? '#fff' : '#000'} />
-          <Text style={[styles.buttonText, isDark && styles.buttonTextDark]}>
+          disabled={loading || !user.emailVerified}>
+          <MessageSquareText size={24} color={isDark ? user.emailVerified ? '#fff' : '#666666' : user.emailVerified ? '#000' : '#999999'} />
+          <Text style={[styles.buttonText, isDark && styles.buttonTextDark, {color: isDark ? !user.emailVerified ? '#666666' : '#fff' : user.emailVerified ? '#000' : '#999999'}]}>
             Feedback
           </Text>
-        </TouchableOpacity>)}
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.signOutButton, isDark && styles.signOutButtonDark]}
